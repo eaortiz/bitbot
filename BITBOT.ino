@@ -1,21 +1,38 @@
  #include <QTRSensors.h>
+ #include <Servo.h>
 
+
+/*---------------- Module Level Variables ---------------------------*/
+//analog
 int rightSensorInput = A0;
 int leftSensorInput = A1;
 int centerSensorInput = A2;
 int serverSensorInput = A3;
 int frontTapeSensorInput = A4;
 int backTapeSensorInput = A5;
-int rightBumperInput = A6;
-int leftBumperInput = A7;
 
-int algorithmOut = 4;
-int rightWheelToggle = 3;
-int leftWheelToggle = 5;
-int rightWheelPWM = 6;
-int leftWheelPWM = 7;
-int threeCoinDumpOut = 8;
-int fiveCoinDumpOut = 9;
+//digital
+//int algorithmOut = 4;
+int rightWheelToggle = 2;
+int leftWheelToggle = 4;
+int rightWheelPWM = 3;
+int leftWheelPWM = 5;
+int pusherToggle=8;
+int threeCoinDumpOut = 9;
+int fiveCoinDumpOut = 10;
+int leftBumperInput=12;
+int rightBumperInput=13;
+
+byte byteRead;
+int motorspeed=255;
+//for collision logic 
+int nextLeft;
+int nextRight;
+Servo myservo1;  // Creates a servo object
+Servo myservo2;  // Creates a servo object
+int pos = 0;    // Variable to store the servos angle 
+int unloadpos=180;
+int loadpos=90;
 
 //states
 int state;
@@ -62,7 +79,10 @@ QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSe
 
 void setup() { 
   state = FIND_SERVER;
-
+  myservo1.attach(threeCoinDumpOut);
+  myservo2.attach(fiveCoinDumpOut);
+  Serial.begin(9600);
+  Serial.println("Starting MEbot...");
   //pins
   pinMode(rightSensorInput,INPUT);
   pinMode(leftSensorInput, INPUT);
@@ -72,7 +92,6 @@ void setup() {
   pinMode(backTapeSensorInput, INPUT);
   pinMode(rightBumperInput, INPUT);
   pinMode(leftBumperInput, INPUT);
-
   pinMode(algorithmOut, OUTPUT);
   pinMode(rightWheelToggle, OUTPUT);
   pinMode(leftWheelToggle, OUTPUT);
@@ -80,6 +99,21 @@ void setup() {
   pinMode(leftWheelPWM, OUTPUT);
   pinMode(threeCoinDumpOut, OUTPUT);
   pinMode(fiveCoinDumpOut, OUTPUT);
+  pinMode(pusherToggle,OUTPUT);
+  
+//collision logic
+  nextLeft=digitalRead(leftCollisionPin);
+  nextRight=digitalRead(rightCollisionPin);
+//testing
+  digitalWrite(motor2toggle,HIGH);
+  digitalWrite(motor1toggle,LOW);
+  digitalWrite(pusherpin,HIGH);
+  analogWrite(motor1pwm,255);
+  analogWrite(motor2pwm,255);
+//  Testparts
+  push();
+  unloadServo1();
+//  myservo2.attach(servo2);
 }
 
 void loop() { 
@@ -421,4 +455,37 @@ unsigned char TestTimerExpired(void) {
     TMRArd_ClearTimerExpired(0);
   }
   return value;
+}
+//This function sweeps the servo searching the area for an object within range
+void unloadServo1()
+{
+  Serial.println("Unloading...");
+  for(pos = unloadpos; pos>=loadpos; pos -= 1)     // goes from 180 degrees to 0 degrees 
+  {                                
+    myservo1.write(pos);              // tell servo to go to position in variable 'pos' 
+    delayMicroseconds(DELAY);
+  }
+  for(pos = loadpos; pos < unloadpos; pos += 1)  // goes from 0 degrees to 180 degrees 
+  {                                  // in steps of 1 degree 
+    myservo1.write(pos);              // tell servo to go to position in variable 'pos'
+    delayMicroseconds(DELAY);
+  }    
+}
+
+void push()
+{
+  digitalWrite(pushertoggle,HIGH);
+  delay(pusher_time_interval);
+  digitalWrite(pushertoggle,LOW);
+}
+void toggleMotorDirection()
+{
+  PORTD= PORTD ^ B00010100;
+}
+void adjustMotorSpeed()
+{
+  analogWrite(motor1pwm,motorspeed);
+  analogWrite(motor2pwm,motorspeed);
+  Serial.println(motorspeed);
+
 }
