@@ -40,6 +40,7 @@ int DUMPING = 17;
 //constants
 int RIGHT = 1;
 int LEFT = 0;
+int MAX_TAPE_SENSOR_VAL = 1023;
 
 //variables
 int timeGoingBack = 2;
@@ -49,6 +50,11 @@ int coinsGotten = 0;
 int coinsWanted = 0;
 int pushes = 0;
 int motorSpeed = 255;
+int pusher_time_interval= 500; //half a second?
+boolean hasDumped = false;
+int linesSensed = 0;
+int curr_tape_sensor_values[2];
+char sequence_of_tape_sensor_changes[] = ""; //A front on, B front off, C back on, D back off
 
 //sensors
 QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSensorInput}, 2);
@@ -191,6 +197,7 @@ void loop() {
 		}
 	}
 	if (state == DUMPING) {
+		hasDumped = true;
 		if (doneDumping()) {
 			goBack();
 			state = GO_BACK;
@@ -205,11 +212,12 @@ void loop() {
 
 }
 
-void serverLightSensed() { 
+boolean serverLightSensed() { 
+	return (digitalRead(serverSensorInput) == HIGH);
 }
 
 void serverFound() {
-	//stop and go straight
+	//go straight
 }
 
 boolean rightBumperHit() { 
@@ -230,7 +238,7 @@ boolean leftBumperHit() {
 }
 
 void reverseFromLeft() {
-
+	bumpedRightOrLeft = LEFT;
 }
 
 void goForward() { 
@@ -242,20 +250,43 @@ void alignWithTape() {
 }
 
 boolean alignedWithTape() { 
-	//test tape sensors
+	
+}
+
+void updateTapeSensorStatus() {
+
+	int sensor_values[2];
+	tapeSensors.read(sensor_values);
+	if (sensor_values[0] > 3/4 * MAX_TAPE_SENSOR_VAL) { 
+		curr_tape_sensor_values[0] = HIGH;
+		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'A';
+	}
+	if (sensor_values[0] < 1/4 * MAX_TAPE_SENSOR_VAL) { 
+		curr_tape_sensor_values[0] = LOW;
+		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'B';
+	}
+	if (sensor_values[1] > 3/4 * MAX_TAPE_SENSOR_VAL) { 
+		curr_tape_sensor_values[1] = HIGH;
+		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'C';
+	}
+	if (sensor_values[1] < 1/4 * MAX_TAPE_SENSOR_VAL) { 
+		curr_tape_sensor_values[1] = LOW;
+		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'D';
+	}
+
 }
 
 void getThreeCoins() { 
-	//set coinsWanted
-	//set timer for first coin
-
+	if (hasDumped) coinsWanted = 11;
+	else coinsWanted = 3;
+	TMRArd_InitTimer(0, pusher_time_interval); 
 }
-
-
 
 void getFiveCoins() { 
+	if (hasDumped) coinsWanted = 16;
+	else coinsWanted = 8;
+	TMRArd_InitTimer(0, pusher_time_interval); 
 }
-
 
 
 void pushAlgorithmButton() { 
@@ -272,7 +303,7 @@ void pushAlgorithmButton() {
 void collect() { 
 	if (coinsGotten < coinsWanted) { 
 		pushAlgorithmButton();
-		TMRArd_InitTimer(0, TIME_INTERVAL); //set timer
+		TMRArd_InitTimer(0, pusher_time_interval);
 	}
 }
 
@@ -289,7 +320,8 @@ void goForwardAlongTape() {
 }
 
 boolean tapeUnseen() {
-
+	updateTapeSensorStatus();
+	return curr_tape_sensor_values[0] == LOW and curr_tape_sensor_values[1] == LOW;
 }
 
 
@@ -326,8 +358,14 @@ void turnTo5() {
 	//change motor directions
 }
 
+//A front on, B front off, C back on, D back off
 boolean twoLinesSensed()  {
-
+	updateTapeSensorStatus();
+	if (sequence_of_tape_sensor_changes == "ABCDABCD") {
+		sequence_of_tape_sensor_changes = "";
+		return true;
+	}
+	return false;
 }
 
 void dumpFive() {
@@ -335,15 +373,25 @@ void dumpFive() {
 }
 
 boolean threeLinesSensed() { 
-
+	updateTapeSensorStatus();
+	if (sequence_of_tape_sensor_changes == "ABCDABCDABCD") {
+		sequence_of_tape_sensor_changes = "";
+		return true;
+	}
+	return false;
 }
 
 void dumpThree() {
 
 }
 
-void oneLineSensed() { 
-
+boolean oneLineSensed() { 
+	updateTapeSensorStatus();
+	if (sequence_of_tape_sensor_changes == "ABCD") {
+		sequence_of_tape_sensor_changes = "";
+		return true;
+	}
+	return false;
 }
 
 void dumpEight() { 
@@ -359,7 +407,12 @@ void goBack() {
 }
 
 boolean lineTapeIsSensed() { 
-
+	updateTapeSensorStatus();
+	if (sequence_of_tape_sensor_changes == "CDAB") {
+		sequence_of_tape_sensor_changes = "";
+		return true;
+	}
+	return false;
 }
 
 unsigned char TestTimerExpired(void) {
