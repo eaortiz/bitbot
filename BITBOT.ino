@@ -1,7 +1,6 @@
  #include <QTRSensors.h>
  #include <Servo.h>
 
-
 /*---------------- Module Level Variables ---------------------------*/
 //analog
 int rightSensorInput = A0;
@@ -12,27 +11,15 @@ int frontTapeSensorInput = A4;
 int backTapeSensorInput = A5;
 
 //digital
-//int algorithmOut = 4;
 int rightWheelToggle = 2;
 int leftWheelToggle = 4;
 int rightWheelPWM = 3;
 int leftWheelPWM = 5;
-int pusherToggle=8;
+int pusherToggle = 8;
 int threeCoinDumpOut = 9;
 int fiveCoinDumpOut = 10;
-int leftBumperInput=12;
-int rightBumperInput=13;
-
-byte byteRead;
-int motorspeed=255;
-//for collision logic 
-int nextLeft;
-int nextRight;
-Servo myservo1;  // Creates a servo object
-Servo myservo2;  // Creates a servo object
-int pos = 0;    // Variable to store the servos angle 
-int unloadpos=180;
-int loadpos=90;
+int leftBumperInput = 12;
+int rightBumperInput = 13;
 
 //states
 int state;
@@ -72,6 +59,15 @@ boolean hasDumped = false;
 int linesSensed = 0;
 int curr_tape_sensor_values[2];
 char sequence_of_tape_sensor_changes[] = ""; //A front on, B front off, C back on, D back off
+byte byteRead;
+int motorspeed = 255;
+
+//for collision logic 
+int nextLeft;
+int nextRight;
+
+Servo threeCoinDump;  // Creates a servo object
+Servo fiveCoinDump;  // Creates a servo object
 
 //sensors
 QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSensorInput}, 2);
@@ -79,8 +75,9 @@ QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSe
 
 void setup() { 
   state = FIND_SERVER;
-  myservo1.attach(threeCoinDumpOut);
-  myservo2.attach(fiveCoinDumpOut);
+  threeCoinDump.attach(threeCoinDumpOut);
+  fiveCoinDump.attach(fiveCoinDumpOut);
+
   Serial.begin(9600);
   Serial.println("Starting MEbot...");
   //pins
@@ -104,12 +101,14 @@ void setup() {
 //collision logic
   nextLeft=digitalRead(leftCollisionPin);
   nextRight=digitalRead(rightCollisionPin);
+
 //testing
   digitalWrite(motor2toggle,HIGH);
   digitalWrite(motor1toggle,LOW);
   digitalWrite(pusherpin,HIGH);
   analogWrite(motor1pwm,255);
   analogWrite(motor2pwm,255);
+
 //  Testparts
   push();
   unloadServo1();
@@ -324,7 +323,7 @@ void getFiveCoins() {
 
 
 void pushAlgorithmButton() { 
-	//push button
+	push();
 	pushes += 1;
 	if (pushes == coinsGotten) { 
 		coinsGotten +=1;
@@ -403,7 +402,7 @@ boolean twoLinesSensed()  {
 }
 
 void dumpFive() {
-
+	unloadFiveDumpServo();
 }
 
 boolean threeLinesSensed() { 
@@ -416,7 +415,7 @@ boolean threeLinesSensed() {
 }
 
 void dumpThree() {
-
+	unloadThreeDumpServo();
 }
 
 boolean oneLineSensed() { 
@@ -429,7 +428,8 @@ boolean oneLineSensed() {
 }
 
 void dumpEight() { 
-
+	unloadThreeDumpServo();
+	unloadFiveDumpServo();
 }
 
 void doneDumping() { 
@@ -457,35 +457,52 @@ unsigned char TestTimerExpired(void) {
   return value;
 }
 //This function sweeps the servo searching the area for an object within range
-void unloadServo1()
-{
-  Serial.println("Unloading...");
-  for(pos = unloadpos; pos>=loadpos; pos -= 1)     // goes from 180 degrees to 0 degrees 
-  {                                
-    myservo1.write(pos);              // tell servo to go to position in variable 'pos' 
-    delayMicroseconds(DELAY);
-  }
-  for(pos = loadpos; pos < unloadpos; pos += 1)  // goes from 0 degrees to 180 degrees 
-  {                                  // in steps of 1 degree 
-    myservo1.write(pos);              // tell servo to go to position in variable 'pos'
-    delayMicroseconds(DELAY);
-  }    
+void unloadThreeDumpServo() {
+
+	Serial.println("Unloading...");
+	for(int pos = 180; pos>=90; pos -= 1)     // goes from 180 degrees to 0 degrees 
+	{                                
+	  threeCoinDump.write(pos);              // tell servo to go to position in variable 'pos' 
+	  delayMicroseconds(DELAY);
+    }
+	for(int pos = 90; pos < 180; pos += 1)  // goes from 0 degrees to 180 degrees 
+	{                                  // in steps of 1 degree 
+	  threeCoinDump.write(pos);              // tell servo to go to position in variable 'pos'
+	  delayMicroseconds(DELAY);
+	}    
 }
 
-void push()
-{
+void unloadFiveDumpServo() {
+
+	Serial.println("Unloading...");
+	for(int pos = 180; pos>=90; pos -= 1)     // goes from 180 degrees to 0 degrees 
+	{                                
+	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos' 
+	  delayMicroseconds(DELAY);
+    }
+	for(int pos = 90; pos < 180; pos += 1)  // goes from 0 degrees to 180 degrees 
+	{                                  // in steps of 1 degree 
+	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos'
+	  delayMicroseconds(DELAY);
+	}    
+}
+
+void push() {
   digitalWrite(pushertoggle,HIGH);
   delay(pusher_time_interval);
   digitalWrite(pushertoggle,LOW);
 }
+
 void toggleMotorDirection()
 {
   PORTD= PORTD ^ B00010100;
 }
-void adjustMotorSpeed()
+
+void adjustMotorSpeed(int rightSpeed, leftSpeed)
 {
-  analogWrite(motor1pwm,motorspeed);
-  analogWrite(motor2pwm,motorspeed);
+  analogWrite(motor1pwm,rightSpeed);
+  analogWrite(motor2pwm,leftSpeed);
   Serial.println(motorspeed);
+
 
 }
