@@ -3,11 +3,13 @@
 #include <Servo.h>
 
 #define TIME_BACKWARDS 500
+#define TURN_TIME 250
 #define PUSHER_TIME 500
 #define RIGHT 1
 #define LEFT 0
 #define MAX_TAPE_SENSOR_VAL 1023
 #define MAX_SPEED 255
+#define DELAY 500
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
@@ -60,7 +62,7 @@ int pushes = 0;
 boolean hasDumped = false;
 int linesSensed = 0;
 int curr_tape_sensor_values[2];
-char sequence_of_tape_sensor_changes[] = ""; //A front on, B front off, C back on, D back off
+char *sequence_of_tape_sensor_changes; //A front on, B front off, C back on, D back off
 byte byteRead;
 int sideToAlign;
 
@@ -356,7 +358,6 @@ void pushAlgorithmButton() {
 	pushes += 1;
 	if (pushes == coinsGotten) { 
 		coinsGotten +=1;
-		pushed = 0;
 	}
 
 }
@@ -364,7 +365,7 @@ void pushAlgorithmButton() {
 void collect() { 
 	if (coinsGotten < coinsWanted) { 
 		pushAlgorithmButton();
-		TMRArd_InitTimer(0, pusher_time_interval);
+		TMRArd_InitTimer(0, PUSHER_TIME);
 	}
 }
 
@@ -549,9 +550,9 @@ void unloadFiveDumpServo() {
 }
 
 void push() {
-  digitalWrite(pushertoggle,HIGH);
+  digitalWrite(pusherToggle,HIGH);
   delay(PUSHER_TIME);
-  digitalWrite(pushertoggle,LOW);
+  digitalWrite(pusherToggle,LOW);
 }
 
 void toggleMotorDirection()
