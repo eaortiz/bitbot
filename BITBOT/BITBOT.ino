@@ -55,7 +55,7 @@ int state;
 #define REALIGN 18
 
 //variables
-int bumpedRightOrLeft; //right or left one is three
+int bumpedRightOrLeft = RIGHT; //right or left one is three
 int coinsGotten = 0;
 int coinsWanted = 0;
 int pushes = 0;
@@ -113,15 +113,14 @@ void setup() {
 //collision logic
   nextLeft=digitalRead(leftBumperInput);
   nextRight=digitalRead(rightBumperInput);
-
-//testing
-  digitalWrite(rightWheelToggle,HIGH);
-  digitalWrite(leftWheelToggle,LOW);
-  analogWrite(rightMotorPWM,255);
-  analogWrite(leftMotorPWM,255);
-
+  Serial.print("eyoo");
 //  Testparts
   push();
+  goForward();
+  delay(500);
+  goBackwards();
+  delay(500);
+  alignWithTape();
 }
 
 void loop() { 
@@ -232,19 +231,19 @@ void loop() {
 		}
 	}
 	if (state == GOING_TO_5) {
-		if (twoLinesSensed()) { 
+		if (atFive()) { 
 			dumpFive();
 			state = DUMPING;
 		}
 	}
 	if (state == GOING_TO_3) {
-		if (threeLinesSensed()) { 
+		if (atThree()) { 
 			dumpThree();
 			state = DUMPING;
 		}
 	}
 	if (state == GOING_TO_8) {
-		if (oneLineSensed()) {
+		if ((rightBackBumperHit() || leftBackBumperHit()) && oneLineSensed()) {
 			dumpEight();
 			state = DUMPING;
 		}
@@ -274,18 +273,32 @@ boolean rightBumperHit() {
     }
 }
 
-void reverseFromRight() {
-	TMRArd_InitTimer(0, TIME_BACKWARDS); 
-	goBackwards();
-	bumpedRightOrLeft = RIGHT;
-	sideToAlign = RIGHT;
-}
-
 boolean leftBumperHit() {
 	if (!(digitalRead(leftBumperInput) == nextLeft)) {
         nextLeft = digitalRead(leftBumperInput);
         return true;
 	}
+}
+
+boolean rightBackBumperHit() {
+	if (!(digitalRead(backRightBumperInput) == nextLeft)) {
+        nextLeft = digitalRead(backRightBumperInput);
+        return true;
+	}
+}
+
+boolean leftBackBumperHit() { 
+	if (!(digitalRead(backLeftBumperInput) == nextLeft)) {
+        nextLeft = digitalRead(backLeftBumperInput);
+        return true;
+	}
+}
+
+void reverseFromRight() {
+	TMRArd_InitTimer(0, TIME_BACKWARDS); 
+	goBackwards();
+	bumpedRightOrLeft = RIGHT;
+	sideToAlign = RIGHT;
 }
 
 void reverseFromLeft() {
@@ -305,10 +318,10 @@ void goForward() {
 
 void alignWithTape() {
 	if (sideToAlign == LEFT) { 
-		adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED/2);
+		adjustMotorSpeed(MAX_SPEED/4, -1 * MAX_SPEED/4);
 	}
 	if (sideToAlign == RIGHT) { 
-		adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+		adjustMotorSpeed(-1 * MAX_SPEED/4, MAX_SPEED/4);
 	}
 }
 
@@ -498,10 +511,6 @@ void dumpEight() {
 	unloadFiveDumpServo();
 }
 
-void goBack() { 
-
-}
-
 boolean lineTapeIsSensed() { 
 	updateTapeSensorStatus();
 	if (sequence_of_tape_sensor_changes == "CDAB") {
@@ -509,6 +518,28 @@ boolean lineTapeIsSensed() {
 		return true;
 	}
 	return false;
+}
+
+boolean atFive() { 
+	boolean bumped = false;
+	if (bumpedRightOrLeft == LEFT) { 
+		bumped = rightBackBumperHit();
+	}
+	if (bumpedRightOrLeft == RIGHT) {
+		bumped = leftBackBumperHit();
+	}
+	twoLinesSensed();
+}
+
+boolean atThree() { 
+	boolean bumped = false;
+	if (bumpedRightOrLeft == RIGHT) { 
+		bumped = rightBackBumperHit();
+	}
+	if (bumpedRightOrLeft == LEFT) {
+		bumped = leftBackBumperHit();
+	}
+	threeLinesSensed();
 }
 
 unsigned char TestTimerExpired(void) {
