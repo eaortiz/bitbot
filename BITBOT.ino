@@ -116,6 +116,19 @@ void setup() {
 }
 
 void loop() { 
+//      collision detection logic
+//       if (Serial.available()) {
+//             state=DECIDE;
+//           }
+//           if (!(digitalRead(leftCollisionPin)==nextLeft)) {
+//             nextLeft=digitalRead(leftCollisionPin);
+//             Serial.println("left Collision");
+//           }
+//           if (!(digitalRead(rightCollisionPin)==nextRight)) {
+//             nextRight=digitalRead(rightCollisionPin);
+//             Serial.println("right Collision");
+//           }
+//           break;
 	if (state == FIND_SERVER) { 
 		if(serverLightSensed()) {
 				serverFound();
