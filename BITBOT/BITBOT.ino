@@ -1,66 +1,68 @@
- #include <QTRSensors.h>
- #include <Servo.h>
+#include <QTRSensors.h>
+#include <Timers.h>
+#include <Servo.h>
+
+#define TIME_BACKWARDS 500
+#define PUSHER_TIME 500
+#define RIGHT 1
+#define LEFT 0
+#define MAX_TAPE_SENSOR_VAL 1023
+#define MAX_SPEED 255
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
-int rightSensorInput = A0;
-int leftSensorInput = A1;
-int centerSensorInput = A2;
-int serverSensorInput = A3;
-int frontTapeSensorInput = A4;
-int backTapeSensorInput = A5;
+#define rightSensorInput A0
+#define leftSensorInput A4
+#define centerSensorInput A2
+#define serverSensorInput A5
+#define frontTapeSensorInput 15
+#define backTapeSensorInput 17
 
 //digital
-int rightWheelToggle = 2;
-int leftWheelToggle = 4;
-int rightWheelPWM = 3;
-int leftWheelPWM = 5;
-int pusherToggle = 8;
-int threeCoinDumpOut = 9;
-int fiveCoinDumpOut = 10;
-int leftBumperInput = 12;
-int rightBumperInput = 13;
+#define rightWheelToggle 2
+#define leftWheelToggle 4
+#define rightMotorPWM 3
+#define leftMotorPWM 5
+#define backRightBumperInput 6
+#define backLeftBumperInput 7
+#define pusherToggle 8
+#define threeCoinDumpOut 9
+#define fiveCoinDumpOut 10
+#define leftBumperInput 12
+#define rightBumperInput 13
 
 //states
 int state;
-int FIND_SERVER = 0; //going around looking for light
-int GO_TO_SERVER = 1; //going straight until server is hit
-int REVERSE = 2; //align 
-int FORWARD = 4; //reach tape
-int ALIGN_WITH_TAPE = 5; //turn forward
-int GET_3_COINS = 6;
-int GET_5_COINS = 7;
-int TURNING = 8;
-int TURN_AROUND = 9;
-int GOING_TO_CENTER = 10;
-int TURNING_TO_3 = 11;
-int TURNING_TO_5 = 12;
-int GOING_TO_3 = 13;
-int GOING_TO_5 = 14;
-int GOING_TO_8 = 15;
-int GO_BACK = 16;
-int DUMPING = 17;
-
-//constants
-int RIGHT = 1;
-int LEFT = 0;
-int MAX_TAPE_SENSOR_VAL = 1023;
+#define FIND_SERVER 0 //going around looking for light
+#define GO_TO_SERVER 1 //going straight until server is hit
+#define REVERSE 2 //align 
+#define FORWARD 4 //reach tape
+#define ALIGN_WITH_TAPE 5 //turn forward
+#define GET_3_COINS 6
+#define GET_5_COINS 7
+#define TURNING 8
+#define TURN_BACK 9
+#define GOING_TO_CENTER 10
+#define TURNING_TO_3 11
+#define TURNING_TO_5 12
+#define GOING_TO_3 13
+#define GOING_TO_5 14
+#define GOING_TO_8 15
+#define GO_BACK 16
+#define DUMPING 17
+#define REALIGN 18
 
 //variables
-int timeGoingBack = 2;
-int timeGoingForward = 4;
 int bumpedRightOrLeft; //right or left one is three
 int coinsGotten = 0;
 int coinsWanted = 0;
 int pushes = 0;
-int motorSpeed = 255;
-int pusher_time_interval= 500; //half a second?
 boolean hasDumped = false;
 int linesSensed = 0;
 int curr_tape_sensor_values[2];
 char sequence_of_tape_sensor_changes[] = ""; //A front on, B front off, C back on, D back off
 byte byteRead;
-int motorspeed = 255;
+int sideToAlign;
 
 //for collision logic 
 int nextLeft;
@@ -72,8 +74,16 @@ Servo fiveCoinDump;  // Creates a servo object
 //sensors
 QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSensorInput}, 2);
 
-
 void setup() { 
+  for (int i = 0; i < 250; i++) // make the calibration take about 5 seconds
+  {
+    tapeSensors.calibrate();
+    delay(20);
+  }
+
+  
+  TMRArd_ClearTimerExpired(0);
+  
   state = FIND_SERVER;
   threeCoinDump.attach(threeCoinDumpOut);
   fiveCoinDump.attach(fiveCoinDumpOut);
@@ -89,49 +99,34 @@ void setup() {
   pinMode(backTapeSensorInput, INPUT);
   pinMode(rightBumperInput, INPUT);
   pinMode(leftBumperInput, INPUT);
-  pinMode(algorithmOut, OUTPUT);
+  pinMode(pusherToggle, OUTPUT);
   pinMode(rightWheelToggle, OUTPUT);
   pinMode(leftWheelToggle, OUTPUT);
-  pinMode(rightWheelPWM, OUTPUT);
-  pinMode(leftWheelPWM, OUTPUT);
+  pinMode(rightMotorPWM, OUTPUT);
+  pinMode(leftMotorPWM, OUTPUT);
   pinMode(threeCoinDumpOut, OUTPUT);
   pinMode(fiveCoinDumpOut, OUTPUT);
   pinMode(pusherToggle,OUTPUT);
   
 //collision logic
-  nextLeft=digitalRead(leftCollisionPin);
-  nextRight=digitalRead(rightCollisionPin);
+  nextLeft=digitalRead(leftBumperInput);
+  nextRight=digitalRead(rightBumperInput);
 
 //testing
-  digitalWrite(motor2toggle,HIGH);
-  digitalWrite(motor1toggle,LOW);
-  digitalWrite(pusherpin,HIGH);
-  analogWrite(motor1pwm,255);
-  analogWrite(motor2pwm,255);
+  digitalWrite(rightWheelToggle,HIGH);
+  digitalWrite(leftWheelToggle,LOW);
+  analogWrite(rightMotorPWM,255);
+  analogWrite(leftMotorPWM,255);
 
 //  Testparts
   push();
-  unloadServo1();
-//  myservo2.attach(servo2);
 }
 
 void loop() { 
-//      collision detection logic
-//       if (Serial.available()) {
-//             state=DECIDE;
-//           }
-//           if (!(digitalRead(leftCollisionPin)==nextLeft)) {
-//             nextLeft=digitalRead(leftCollisionPin);
-//             Serial.println("left Collision");
-//           }
-//           if (!(digitalRead(rightCollisionPin)==nextRight)) {
-//             nextRight=digitalRead(rightCollisionPin);
-//             Serial.println("right Collision");
-//           }
-//           break;
+
 	if (state == FIND_SERVER) { 
 		if(serverLightSensed()) {
-				serverFound();
+				goForward();
 				state = GO_TO_SERVER;
 			} 
 	}
@@ -185,18 +180,22 @@ void loop() {
 		}
 		if (doneCollecting()) {
 			bumpedRightOrLeft = RIGHT;
-			alignWithTape();
-			state = TURN_AROUND;
+			turnBack();
+			state = TURN_BACK;
 		}
 
 	}
-	if (state == TURN_AROUND) { 
+	if (state == TURN_BACK) { 
 		if(alignedWithTape()) { 
-			goForwardAlongTape();
+			goBackwards();
 			state = GOING_TO_CENTER;
 		}
 	}
 	if (state == GOING_TO_CENTER) {
+		if(missaligned()) { 
+			alignWithTape();
+			state = REALIGN;
+		}
 		if(tapeUnseen()) { 
 			if (threeIsAvailable()) { 
 				turnTo3();
@@ -207,20 +206,26 @@ void loop() {
 				state = TURNING_TO_5;
 			}	
 			else if (eightIsAvailable()) { 
-				goForward();
+				goBackwards();
 				state = GOING_TO_8;
 			}
 		}
 	}
+	if (state == REALIGN) { 
+		if (alignedWithTape()) { 
+			goBackwards();
+			state = GOING_TO_CENTER;
+		}
+	}
 	if (state == TURNING_TO_3) { 
 		if (TestTimerExpired()) {
-			goForward();
+			goBackwards();
 			state = GOING_TO_3;
 		}
 	}
 	if (state == TURNING_TO_5) {
 		if (TestTimerExpired()) {
-			goForward();
+			goBackwards();
 			state = GOING_TO_5;
 		}
 	}
@@ -244,10 +249,8 @@ void loop() {
 	}
 	if (state == DUMPING) {
 		hasDumped = true;
-		if (doneDumping()) {
-			goBack();
-			state = GO_BACK;
-		}
+		goForward();
+		state = GO_BACK;
 	}
 	if (state == GO_BACK) {
 		if (lineTapeIsSensed()) {
@@ -262,50 +265,63 @@ boolean serverLightSensed() {
 	return (digitalRead(serverSensorInput) == HIGH);
 }
 
-void serverFound() {
-	//go straight
-}
-
 boolean rightBumperHit() { 
-	int hit = digitalRead(rightBumperInput);
-	if (hit == HIGH) return true;
-	return false;
+	if (!(digitalRead(rightBumperInput) == nextRight)) {
+        nextRight = digitalRead(rightBumperInput);
+        return true;
+    }
 }
 
 void reverseFromRight() {
-	//set timer and reverse
+	TMRArd_InitTimer(0, TIME_BACKWARDS); 
+	goBackwards();
 	bumpedRightOrLeft = RIGHT;
+	sideToAlign = RIGHT;
 }
 
 boolean leftBumperHit() {
-	int hit = digitalRead(leftBumperInput);
-	if (hit == HIGH) return true;
-	return false;
+	if (!(digitalRead(leftBumperInput) == nextLeft)) {
+        nextLeft = digitalRead(leftBumperInput);
+        return true;
+	}
 }
 
 void reverseFromLeft() {
+	TMRArd_InitTimer(0, TIME_BACKWARDS); 
+	goBackwards();
 	bumpedRightOrLeft = LEFT;
+	sideToAlign = LEFT;
+}
+
+void goBackwards() { 
+	adjustMotorSpeed(-1 * MAX_SPEED, -1 * MAX_SPEED);
 }
 
 void goForward() { 
-	//set timer and go forward
+	adjustMotorSpeed(MAX_SPEED, MAX_SPEED);
 }
 
 void alignWithTape() {
-
+	if (sideToAlign == LEFT) { 
+		adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED/2);
+	}
+	if (sideToAlign == RIGHT) { 
+		adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	}
 }
 
 boolean alignedWithTape() { 
-	
+	updateTapeSensorStatus();
+	return (curr_tape_sensor_values[0] == HIGH and curr_tape_sensor_values[1] == HIGH);
 }
 
 void updateTapeSensorStatus() {
 
-	int sensor_values[2];
+	unsigned int sensor_values[2];
 	tapeSensors.read(sensor_values);
 	if (sensor_values[0] > 3/4 * MAX_TAPE_SENSOR_VAL) { 
 		curr_tape_sensor_values[0] = HIGH;
-		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'A';
+		sequence_of_tape_sensor_changes += 'A';
 	}
 	if (sensor_values[0] < 1/4 * MAX_TAPE_SENSOR_VAL) { 
 		curr_tape_sensor_values[0] = LOW;
@@ -325,13 +341,13 @@ void updateTapeSensorStatus() {
 void getThreeCoins() { 
 	if (hasDumped) coinsWanted = 11;
 	else coinsWanted = 3;
-	TMRArd_InitTimer(0, pusher_time_interval); 
+	TMRArd_InitTimer(0, PUSHER_TIME); 
 }
 
 void getFiveCoins() { 
 	if (hasDumped) coinsWanted = 16;
 	else coinsWanted = 8;
-	TMRArd_InitTimer(0, pusher_time_interval); 
+	TMRArd_InitTimer(0, PUSHER_TIME); 
 }
 
 
@@ -345,7 +361,6 @@ void pushAlgorithmButton() {
 
 }
 
-
 void collect() { 
 	if (coinsGotten < coinsWanted) { 
 		pushAlgorithmButton();
@@ -358,11 +373,36 @@ boolean doneCollecting() {
 }
 
 void turn() {
-	//turn to collect five
+	adjustMotorSpeed(-1 * MAX_SPEED/2, -1 * MAX_SPEED/2);
+	delay(250);
+	adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED);
+	delay(125);
+	adjustMotorSpeed(MAX_SPEED/2, MAX_SPEED/2);
+	delay(250);
+	adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	delay(125);
 }
 
-void goForwardAlongTape() {
+void turnBack() { 
+	adjustMotorSpeed(-1 * MAX_SPEED/2, -1 * MAX_SPEED/2);
+	delay(250);
+	adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	delay(125);
+	adjustMotorSpeed(MAX_SPEED/2, MAX_SPEED/2);
+	delay(250);
+	adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED);
+	delay(125);
+	sideToAlign = LEFT;
 
+}
+
+boolean missaligned() { 
+	updateTapeSensorStatus();
+	if (curr_tape_sensor_values[0] == LOW or curr_tape_sensor_values[1] == LOW) { 
+		if (sideToAlign == RIGHT) sideToAlign = LEFT;
+		else sideToAlign = RIGHT;
+		return true;	
+	}
 }
 
 boolean tapeUnseen() {
@@ -397,11 +437,23 @@ boolean eightIsAvailable() {
 }
 
 void turnTo3() {
-
+	if (bumpedRightOrLeft == LEFT) {
+		adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	}
+	if (bumpedRightOrLeft == RIGHT) { 
+		adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED/2);
+	}
+	TMRArd_InitTimer(0, TURN_TIME);
 }
+
 void turnTo5() {
-	//set timer
-	//change motor directions
+	if (bumpedRightOrLeft == RIGHT) {
+		adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	}
+	if (bumpedRightOrLeft == LEFT) { 
+		adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED/2);
+	}
+	TMRArd_InitTimer(0, TURN_TIME);
 }
 
 //A front on, B front off, C back on, D back off
@@ -445,10 +497,6 @@ void dumpEight() {
 	unloadFiveDumpServo();
 }
 
-void doneDumping() { 
-
-}
-
 void goBack() { 
 
 }
@@ -488,7 +536,7 @@ void unloadThreeDumpServo() {
 void unloadFiveDumpServo() {
 
 	Serial.println("Unloading...");
-	for(int pos = 180; pos>=90; pos -= 1)     // goes from 180 degrees to 0 degrees 
+	for(int pos = 180; pos >= 90; pos -= 1)     // goes from 180 degrees to 0 degrees 
 	{                                
 	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos' 
 	  delayMicroseconds(DELAY);
@@ -502,7 +550,7 @@ void unloadFiveDumpServo() {
 
 void push() {
   digitalWrite(pushertoggle,HIGH);
-  delay(pusher_time_interval);
+  delay(PUSHER_TIME);
   digitalWrite(pushertoggle,LOW);
 }
 
@@ -511,11 +559,8 @@ void toggleMotorDirection()
   PORTD= PORTD ^ B00010100;
 }
 
-void adjustMotorSpeed(int rightSpeed, leftSpeed)
+void adjustMotorSpeed(int rightSpeed, int leftSpeed)
 {
-  analogWrite(motor1pwm,rightSpeed);
-  analogWrite(motor2pwm,leftSpeed);
-  Serial.println(motorspeed);
-
-
+  analogWrite(rightMotorPWM,rightSpeed);
+  analogWrite(leftMotorPWM,leftSpeed);
 }
