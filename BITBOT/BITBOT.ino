@@ -69,6 +69,8 @@ int sideToAlign;
 //for collision logic 
 int nextLeft;
 int nextRight;
+int nextRightBack;
+int nextLeftBack;
 
 Servo threeCoinDump;  // Creates a servo object
 Servo fiveCoinDump;  // Creates a servo object
@@ -83,6 +85,8 @@ void setup() {
     delay(20);
   }
 
+  digitalWrite(rightWheelToggle, HIGH);
+  digitalWrite(leftWheelToggle, HIGH);
   
   TMRArd_ClearTimerExpired(0);
   
@@ -113,7 +117,9 @@ void setup() {
 //collision logic
   nextLeft=digitalRead(leftBumperInput);
   nextRight=digitalRead(rightBumperInput);
-  Serial.print("eyoo");
+  nextLeftBack = digitalRead(backLeftBumperInput);
+  nextRightBack = digitalRead(backRightBumperInput);
+
 //  Testparts
   push();
   goForward();
@@ -124,7 +130,10 @@ void setup() {
 }
 
 void loop() { 
-
+        leftBumperHit();
+        rightBumperHit();
+        leftBackBumperHit();
+        rightBackBumperHit();
 	if (state == FIND_SERVER) { 
 		if(serverLightSensed()) {
 				goForward();
@@ -267,30 +276,38 @@ boolean serverLightSensed() {
 }
 
 boolean rightBumperHit() { 
-	if (!(digitalRead(rightBumperInput) == nextRight)) {
-        nextRight = digitalRead(rightBumperInput);
-        return true;
-    }
+      int currValue = digitalRead(rightBumperInput);
+      if (!(currValue == nextRight)) {
+          nextRight = currValue;
+          Serial.println("right");
+          return true;
+      }
 }
 
 boolean leftBumperHit() {
-	if (!(digitalRead(leftBumperInput) == nextLeft)) {
-        nextLeft = digitalRead(leftBumperInput);
-        return true;
+        int currValue = digitalRead(leftBumperInput);
+	if (!(currValue == nextLeft)) {
+          nextLeft = currValue;
+          Serial.println("left");
+          return true;
 	}
 }
 
 boolean rightBackBumperHit() {
-	if (!(digitalRead(backRightBumperInput) == nextLeft)) {
-        nextLeft = digitalRead(backRightBumperInput);
-        return true;
+        int currValue = digitalRead(backRightBumperInput);
+	if (!(currValue == nextRightBack)) {
+          nextRightBack = currValue;
+          Serial.println("right back");
+          return true;
 	}
 }
 
 boolean leftBackBumperHit() { 
-	if (!(digitalRead(backLeftBumperInput) == nextLeft)) {
-        nextLeft = digitalRead(backLeftBumperInput);
-        return true;
+        int currValue = digitalRead(backLeftBumperInput);
+	if (!(currValue == nextLeftBack)) {
+          nextLeftBack = currValue;
+          Serial.println("left back");
+          return true;
 	}
 }
 
@@ -593,6 +610,18 @@ void toggleMotorDirection()
 
 void adjustMotorSpeed(int rightSpeed, int leftSpeed)
 {
+  if (rightSpeed < 0) { 
+    rightSpeed = -1 * rightSpeed;
+    int currVal = digitalRead(rightWheelToggle);
+    if (currVal == HIGH)  digitalWrite(rightWheelToggle, LOW);
+    else digitalWrite(rightWheelToggle, HIGH);
+  }
+  if (leftSpeed < 0) { 
+    leftSpeed = -1 * leftSpeed;
+    int currVal = digitalRead(leftWheelToggle);
+    if (currVal == HIGH)  digitalWrite(leftWheelToggle, LOW);
+    else digitalWrite(leftWheelToggle, HIGH);
+  }
   analogWrite(rightMotorPWM,rightSpeed);
   analogWrite(leftMotorPWM,leftSpeed);
 }
