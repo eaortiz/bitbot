@@ -82,23 +82,9 @@ Servo fiveCoinDump;  // Creates a servo object
 QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSensorInput}, 2);
 
 void setup() { 
-  for (int i = 0; i < 250; i++) // make the calibration take about 5 seconds
-  {
-    tapeSensors.calibrate();
-    delay(20);
-  }
-
-  digitalWrite(rightWheelToggle, HIGH);
-  digitalWrite(leftWheelToggle, HIGH);
-  
-  TMRArd_ClearTimerExpired(0);
-  
-  state = FIND_SERVER;
-  threeCoinDump.attach(threeCoinDumpOut);
-  fiveCoinDump.attach(fiveCoinDumpOut);
-
   Serial.begin(9600);
   Serial.println("Starting MEbot...");
+
   //pins
   pinMode(rightSensorInput,INPUT);
   pinMode(leftSensorInput, INPUT);
@@ -117,32 +103,35 @@ void setup() {
   pinMode(fiveCoinDumpOut, OUTPUT);
   pinMode(pusherToggle, OUTPUT);
   pinMode(pusherEnable, OUTPUT);
+
+  //calibrate tape sensors
+  for (int i = 0; i < 250; i++) // make the calibration take about 5 seconds
+  {
+    tapeSensors.calibrate();
+    delay(20);
+  }
+
+  //wheels
+  digitalWrite(rightWheelToggle, HIGH);
+  digitalWrite(leftWheelToggle, HIGH);
   
-//collision logic
+  //servos
+  threeCoinDump.attach(threeCoinDumpOut);
+  fiveCoinDump.attach(fiveCoinDumpOut);
+  
+  //collision logic
   nextLeft = digitalRead(leftBumperInput);
   nextRight = digitalRead(rightBumperInput);
   nextLeftBack = digitalRead(backLeftBumperInput);
   nextRightBack = digitalRead(backRightBumperInput);
 
-//  Testparts
-  //push();
-  //goForward();
-  //delay(500);
-  //goBackwards();
-  //delay(500);
-  //dumpThree();
-  //dumpFive();
-  alignWithTape();
+  TMRArd_ClearTimerExpired(0);
+
+  state = FIND_SERVER;
+  lookAround();
 }
 
 void loop() { 
-        //alignWithTape();
-        //if (alignedWithTape()) Serial.println("ALIGNED");
-       // goForward();
-        //leftBumperHit();
-        //rightBumperHit();
-        //leftBackBumperHit();
-        //rightBackBumperHit();
 	if (state == FIND_SERVER) { 
 		if(serverLightSensed()) {
 				goForward();
@@ -278,6 +267,10 @@ void loop() {
 		}
 	}
 
+}
+
+void lookAround() { 
+	adjustMotorSpeed(-1 * MAX_SPEED/4, MAX_SPEED/4);
 }
 
 boolean serverLightSensed() { 
@@ -632,9 +625,11 @@ void unloadFiveDumpServo() {
 }
 
 void push() {
-  digitalWrite(pusherToggle,HIGH);
-  delay(PUSHER_TIME);
-  digitalWrite(pusherToggle,LOW);
+	digitalWrite(pusherEnable, HIGH);
+  	digitalWrite(pusherToggle, HIGH);
+  	delay(PUSHER_TIME);
+  	digitalWrite(pusherToggle, LOW);
+  	digitalWrite(pusherEnable, LOW);
 }
 
 void toggleMotorDirection()
