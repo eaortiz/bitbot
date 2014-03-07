@@ -461,30 +461,44 @@ boolean tapeUnseen() {
 	return curr_tape_sensor_values[0] == LOW and curr_tape_sensor_values[1] == LOW;
 }
 
+boolean rightSensorOn() { 
+	int input = 2 * pulseIn(rightSensorInput, HIGH, 600);
+	return (input < 339 && input > 327);
+}
+
+boolean centerSensorOn() { 
+	int input = 2 * pulseIn(centerSensorInput, HIGH, 600);
+	return (input < 339 && input > 327);
+}
+
+boolean leftSensorOn() { 
+	int input = 2 * pulseIn(leftSensorInput, HIGH, 600);
+	return (input < 339 && input > 327);
+}
+
 
 boolean threeIsAvailable() {
-	int lightInput;
+	boolean beaconSensed;
 	if (bumpedRightOrLeft == RIGHT) { 
-		lightInput = digitalRead(rightSensorInput);
+		beaconSensed = rightSensorOn();
 	} else { 
-		lightInput = digitalRead(leftSensorInput);
+		beaconSensed = leftSensorOn();
 	}
-	return (coinsGotten == 8 and lightInput == HIGH);
+	return (coinsGotten == 8 and beaconSensed);
 }
 
 boolean fiveIsAvailable() {
-	int lightInput;
+	int beaconSensed;
 	if (bumpedRightOrLeft == RIGHT) { 
-		lightInput = digitalRead(leftSensorInput);
+		beaconSensed = leftSensorOn();
 	} else { 
-		lightInput = digitalRead(rightSensorInput);
+		beaconSensed = rightSensorOn();
 	}
-	return (coinsGotten == 8 and lightInput == HIGH);
+	return (coinsGotten == 8 and beaconSensed);
 }
 
 boolean eightIsAvailable() {
-	int lightInput = digitalRead(centerSensorInput);
-	return (coinsGotten == 8 and lightInput == HIGH);
+	return (coinsGotten == 8 and centerSensorOn();
 }
 
 void turnTo3() {
