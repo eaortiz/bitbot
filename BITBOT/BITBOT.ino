@@ -10,17 +10,20 @@
 #define MAX_TAPE_SENSOR_VAL 1023
 #define MAX_SPEED 255
 #define DELAY 500
+#define TAPE_HIGH 950
+#define TAPE_LOW 900
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
-#define rightSensorInput A0
-#define leftSensorInput A4
-#define centerSensorInput A2
-#define serverSensorInput A5
-#define frontTapeSensorInput 15
-#define backTapeSensorInput 17
+#define rightSensorInput 17
+#define leftSensorInput 16
+#define centerSensorInput 18
+#define serverSensorInput 19
+#define frontTapeSensorInput 14
+#define backTapeSensorInput 15
 
 //digital
+#define pusherEnable 1
 #define rightWheelToggle 2
 #define leftWheelToggle 4
 #define rightMotorPWM 3
@@ -64,7 +67,7 @@ int linesSensed = 0;
 int curr_tape_sensor_values[2];
 char *sequence_of_tape_sensor_changes; //A front on, B front off, C back on, D back off
 byte byteRead;
-int sideToAlign;
+int sideToAlign = RIGHT;
 
 //for collision logic 
 int nextLeft;
@@ -112,33 +115,39 @@ void setup() {
   pinMode(leftMotorPWM, OUTPUT);
   pinMode(threeCoinDumpOut, OUTPUT);
   pinMode(fiveCoinDumpOut, OUTPUT);
-  pinMode(pusherToggle,OUTPUT);
+  pinMode(pusherToggle, OUTPUT);
+  pinMode(pusherEnable, OUTPUT);
   
 //collision logic
-  nextLeft=digitalRead(leftBumperInput);
-  nextRight=digitalRead(rightBumperInput);
+  nextLeft = digitalRead(leftBumperInput);
+  nextRight = digitalRead(rightBumperInput);
   nextLeftBack = digitalRead(backLeftBumperInput);
   nextRightBack = digitalRead(backRightBumperInput);
 
 //  Testparts
-  push();
-  goForward();
-  delay(500);
-  goBackwards();
-  delay(500);
+  //push();
+  //goForward();
+  //delay(500);
+  //goBackwards();
+  //delay(500);
+  //dumpThree();
+  //dumpFive();
   alignWithTape();
 }
 
 void loop() { 
-        leftBumperHit();
-        rightBumperHit();
-        leftBackBumperHit();
-        rightBackBumperHit();
+        //alignWithTape();
+        //if (alignedWithTape()) Serial.println("ALIGNED");
+       // goForward();
+        //leftBumperHit();
+        //rightBumperHit();
+        //leftBackBumperHit();
+        //rightBackBumperHit();
 	if (state == FIND_SERVER) { 
 		if(serverLightSensed()) {
 				goForward();
 				state = GO_TO_SERVER;
-			} 
+		} 
 	}
 	if (state == GO_TO_SERVER) { 
 		if (rightBumperHit()) { 
@@ -272,7 +281,10 @@ void loop() {
 }
 
 boolean serverLightSensed() { 
-	return (digitalRead(serverSensorInput) == HIGH);
+   int input = 	2 * pulseIn(serverSensorInput, HIGH, 600);
+   return (input < 1185 && input > 1165);
+  
+  
 }
 
 boolean rightBumperHit() { 
@@ -288,7 +300,7 @@ boolean leftBumperHit() {
         int currValue = digitalRead(leftBumperInput);
 	if (!(currValue == nextLeft)) {
           nextLeft = currValue;
-          Serial.println("left");
+         Serial.println("left");
           return true;
 	}
 }
@@ -342,28 +354,36 @@ void alignWithTape() {
 	}
 }
 
-boolean alignedWithTape() { 
+boolean alignedWithTape() {
 	updateTapeSensorStatus();
-	return (curr_tape_sensor_values[0] == HIGH and curr_tape_sensor_values[1] == HIGH);
+        boolean res = (curr_tape_sensor_values[0] == HIGH and curr_tape_sensor_values[1] == HIGH);
+        Serial.println(res);
+	return res;
 }
 
 void updateTapeSensorStatus() {
 
 	unsigned int sensor_values[2];
 	tapeSensors.read(sensor_values);
-	if (sensor_values[0] > 3/4 * MAX_TAPE_SENSOR_VAL) { 
+        Serial.println(sensor_values[0]);
+        Serial.println(sensor_values[1]);
+	if (sensor_values[0] > TAPE_HIGH) { 
+               // Serial.println("front high");
 		curr_tape_sensor_values[0] = HIGH;
 		sequence_of_tape_sensor_changes += 'A';
 	}
-	if (sensor_values[0] < 1/4 * MAX_TAPE_SENSOR_VAL) { 
+	if (sensor_values[0] < TAPE_LOW) { 
+               // Serial.println("front low");
 		curr_tape_sensor_values[0] = LOW;
 		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'B';
 	}
-	if (sensor_values[1] > 3/4 * MAX_TAPE_SENSOR_VAL) { 
+	if (sensor_values[1] > TAPE_HIGH) { 
+                //Serial.println("back high");
 		curr_tape_sensor_values[1] = HIGH;
 		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'C';
 	}
-	if (sensor_values[1] < 1/4 * MAX_TAPE_SENSOR_VAL) { 
+	if (sensor_values[1] < TAPE_LOW) { 
+               // Serial.println("back low");
 		curr_tape_sensor_values[1] = LOW;
 		sequence_of_tape_sensor_changes = sequence_of_tape_sensor_changes + 'D';
 	}
