@@ -10,13 +10,15 @@
 #define MAX_TAPE_SENSOR_VAL 1023
 #define MAX_SPEED 255
 #define DELAY 500
-#define TAPE_HIGH 950
-#define TAPE_LOW 900
+#define TAPE_HIGH 10
+#define TAPE_LOW 8
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
-#define rightSensorInput 17
-#define leftSensorInput 16
+//#define rightSensorInput 17
+//#define leftSensorInput 16
+#define distanceTrigger 16
+#define distanceEcho 17
 #define centerSensorInput 18
 #define serverSensorInput 19
 #define frontTapeSensorInput 14
@@ -75,8 +77,9 @@ int nextRight;
 int nextRightBack;
 int nextLeftBack;
 
-Servo threeCoinDump;  // Creates a servo object
-Servo fiveCoinDump;  // Creates a servo object
+//Servos
+Servo threeCoinDump;
+Servo fiveCoinDump;  
 
 //sensors
 QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSensorInput}, 2);
@@ -113,7 +116,7 @@ void setup() {
 
   //wheels
   digitalWrite(rightWheelToggle, HIGH);
-  digitalWrite(leftWheelToggle, HIGH);
+  digitalWrite(leftWheelToggle, LOW);
   
   //servos
   threeCoinDump.attach(threeCoinDumpOut);
@@ -124,15 +127,20 @@ void setup() {
   nextRight = digitalRead(rightBumperInput);
   nextLeftBack = digitalRead(backLeftBumperInput);
   nextRightBack = digitalRead(backRightBumperInput);
+  
+  //pusher
+  digitalWrite(pusherEnable, LOW);
 
   TMRArd_ClearTimerExpired(0);
 
-  state = FIND_SERVER;
-  lookAround();
+//  state = FIND_SERVER;
+//  lookAround();
 }
 
 void loop() { 
-	if (state == FIND_SERVER) { 
+        //alignedWithTape();
+        serverLightSensed();
+        if (state == FIND_SERVER) { 
 		if(serverLightSensed()) {
 				goForward();
 				state = GO_TO_SERVER;
@@ -217,6 +225,7 @@ void loop() {
 				goBackwards();
 				state = GOING_TO_8;
 			}
+			else lookAround();
 		}
 	}
 	if (state == REALIGN) { 
@@ -270,12 +279,22 @@ void loop() {
 }
 
 void lookAround() { 
-	adjustMotorSpeed(-1 * MAX_SPEED/4, MAX_SPEED/4);
+        Serial.println("looking");
+	adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
 }
 
 boolean serverLightSensed() { 
-   int input = 	2 * pulseIn(serverSensorInput, HIGH, 600);
-   return (input < 1185 && input > 1165);
+   unsigned long input;
+   unsigned long inputtwo;
+   unsigned long inputsum;
+//  input = pulseIn(serverSensorInput, LOW, 1200) +  pulseIn(serverSensorInput, HIGH, 1200);
+   input = pulseIn(serverSensorInput,LOW);
+   inputtwo = pulseIn(serverSensorInput,HIGH);
+   inputsum = input+inputtwo;
+   Serial.println(input);
+   Serial.println(inputtwo);
+   Serial.println(inputsum);
+   return (inputsum < 1200 && inputsum > 1100);
   
   
 }
@@ -350,7 +369,7 @@ void alignWithTape() {
 boolean alignedWithTape() {
 	updateTapeSensorStatus();
         boolean res = (curr_tape_sensor_values[0] == HIGH and curr_tape_sensor_values[1] == HIGH);
-        Serial.println(res);
+       // Serial.println(res);
 	return res;
 }
 
@@ -491,7 +510,7 @@ boolean fiveIsAvailable() {
 }
 
 boolean eightIsAvailable() {
-	return (coinsGotten == 8 and centerSensorOn();
+	return (coinsGotten == 8 and centerSensorOn());
 }
 
 void turnTo3() {
@@ -653,4 +672,18 @@ void adjustMotorSpeed(int rightSpeed, int leftSpeed)
   }
   analogWrite(rightMotorPWM,rightSpeed);
   analogWrite(leftMotorPWM,leftSpeed);
+}
+
+int getDistance()
+{
+  digitalWrite(distanceTrigger,HIGH);
+  delayMicroseconds(10); //3 is the min for high
+  digitalWrite(distanceTrigger,LOW);
+  
+  int time = pulseIn(distanceEcho,HIGH); //measures LOW to HIGH changes in pin 4
+  float distance = (float) time / 58.77; //in cm
+  
+  float maxDistance = 100;
+  int led = map(distance, 0, maxDistance, 0, 255);
+  return led;
 }
