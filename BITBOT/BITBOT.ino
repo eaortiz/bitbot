@@ -8,10 +8,14 @@
 #define RIGHT 1
 #define LEFT 0
 #define MAX_TAPE_SENSOR_VAL 1023
-#define MAX_SPEED 255
+#define RIGHT_MAX_SPEED 125
+#define LEFT_MAX_SPEED 170
 #define DELAY 500
 #define TAPE_HIGH 10
 #define TAPE_LOW 8
+#define TIME_TO_MIDDLE 5000
+#define TIME_TO_90 500
+#define TIME_TO_180 1000
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
@@ -20,9 +24,9 @@
 #define distanceTrigger 16
 #define distanceEcho 17
 #define centerSensorInput 18
-#define serverSensorInput 19
+#define serverSensorInput 11
 #define frontTapeSensorInput 14
-#define backTapeSensorInput 15
+#define backTapeSensorInput 19
 
 //digital
 #define pusherEnable 1
@@ -40,10 +44,14 @@
 
 //states
 int state;
-#define FIND_SERVER 0 //going around looking for light
-#define GO_TO_SERVER 1 //going straight until server is hit
-#define REVERSE 2 //align 
-#define FORWARD 4 //reach tape
+#define GET_DIRECTION 0 //going around looking for light
+#define GO_TO_MIDDLE 1
+#define GO_TO_MIDDLE_2 3
+#define LOOKING 2
+#define APPROACH_SERVER 4
+//#define GO_TO_SERVER 1 //going straight until server is hit
+//#define REVERSE 2 //align 
+//#define FORWARD 4 //reach tape
 #define ALIGN_WITH_TAPE 5 //turn forward
 #define GET_3_COINS 6
 #define GET_5_COINS 7
@@ -70,6 +78,7 @@ int curr_tape_sensor_values[2];
 char *sequence_of_tape_sensor_changes; //A front on, B front off, C back on, D back off
 byte byteRead;
 int sideToAlign = RIGHT;
+float TURN_SPEED = .5;
 
 //for collision logic 
 int nextLeft;
@@ -89,8 +98,8 @@ void setup() {
   Serial.println("Starting MEbot...");
 
   //pins
-  pinMode(rightSensorInput,INPUT);
-  pinMode(leftSensorInput, INPUT);
+  pinMode(distanceTrigger,OUTPUT);
+  pinMode(distanceEcho, INPUT);
   pinMode(centerSensorInput, INPUT);
   pinMode(serverSensorInput, INPUT);
   pinMode(frontTapeSensorInput, INPUT);
@@ -108,15 +117,15 @@ void setup() {
   pinMode(pusherEnable, OUTPUT);
 
   //calibrate tape sensors
-  for (int i = 0; i < 250; i++) // make the calibration take about 5 seconds
-  {
-    tapeSensors.calibrate();
-    delay(20);
-  }
+  //for (int i = 0; i < 250; i++) // make the calibration take about 5 seconds
+  //{
+    //tapeSensors.calibrate();
+    //delay(20);
+  //}
 
   //wheels
-  digitalWrite(rightWheelToggle, HIGH);
-  digitalWrite(leftWheelToggle, LOW);
+ digitalWrite(rightWheelToggle, LOW);
+ digitalWrite(leftWheelToggle, HIGH);
   
   //servos
   threeCoinDump.attach(threeCoinDumpOut);
@@ -132,48 +141,83 @@ void setup() {
   digitalWrite(pusherEnable, LOW);
 
   TMRArd_ClearTimerExpired(0);
-
-//  state = FIND_SERVER;
-//  lookAround();
+// state = 1000;
+  state = GET_DIRECTION;
+  lookAroundRight();
+  delay(10);
+ // goForward();
 }
 
+int last_distance = 255;
+
 void loop() { 
-        //alignedWithTape();
-        serverLightSensed();
-        if (state == FIND_SERVER) { 
-		if(serverLightSensed()) {
-				goForward();
-				state = GO_TO_SERVER;
-		} 
+ // getDistance();
+        if (state == GET_DIRECTION) { 
+                if (getDistance() < 20) { 
+                    stopMotor();
+                    delay(1023);
+                   goForward();
+                   delay(1023);
+                   lookAroundLeft();
+                   state = GO_TO_MIDDLE;
+                 // state = 1000;
+                }
 	}
-	if (state == GO_TO_SERVER) { 
-		if (rightBumperHit()) { 
-			reverseFromRight();
-			state = REVERSE;
-		}
-		if (leftBumperHit()) {
-			reverseFromLeft();
-			state = REVERSE;
-		}
-	}
-	if (state == REVERSE) { 
-		if (TestTimerExpired()) {
-			goForward();
-			state = FORWARD;
-		}
-	}
-	if (state == FORWARD) { 
-		if (TestTimerExpired()) {
-			alignWithTape();
-			state = ALIGN_WITH_TAPE;
-		}
-	}
-	if (state == ALIGN_WITH_TAPE) { 
-		if (alignedWithTape()) { 
-			getThreeCoins();
-			state = GET_3_COINS;
-		}
-	}
+        
+        if (state == GO_TO_MIDDLE) { 
+          Serial.println("mid");
+          int curr_d = getDistance();
+          if (last_distance > curr_d) { 
+            last_distance = curr_d;
+            //lookAroundLeft();
+            stopMotor();
+            delay(1023);
+            goForward();
+            delay(1023);
+            if (last_distance == 255) { 
+              state == 1000; //make it hte next one;
+            } else { 
+              lookAroundRight();
+              state = GO_TO_MIDDLE_2;
+             // state = 1000;
+            }
+          }
+          
+        if (state == GO_TO_MIDDLE_2) { 
+          Serial.println("mid2");
+            int curr_d = getDistance();
+          if (last_distance > curr_d) { 
+            last_distance = curr_d;
+            stopMotor();
+            delay(1023);
+            goForward();
+            delay(1023);
+            if (last_distance == 255) { 
+              state == 1000; //make it hte next one;
+            } else { 
+              lookAroundLeft();
+              state = GO_TO_MIDDLE;
+            }
+          }
+         // if(TestTimerExpired()) { 
+           // stopMotor();
+           // lookAround();
+            //state = LOOKING;
+          }
+
+        }
+        if (state == LOOKING) { 
+          if (serverLightSensed()) { 
+            goForward();
+            state = APPROACH_SERVER;
+          }
+        }
+        if (state == APPROACH_SERVER) { 
+          if(rightBumperHit() || leftBumperHit()) { 
+             stopMotor();
+             state = GET_3_COINS;
+          }
+        }
 	if (state == GET_3_COINS) { 
 		if (TestTimerExpired()) { 
 			collect();
@@ -225,7 +269,7 @@ void loop() {
 				goBackwards();
 				state = GOING_TO_8;
 			}
-			else lookAround();
+			//else lookAround();
 		}
 	}
 	if (state == REALIGN) { 
@@ -278,9 +322,12 @@ void loop() {
 
 }
 
-void lookAround() { 
-        Serial.println("looking");
-	adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+void lookAroundRight() { 
+        adjustMotorSpeed(-1 * (float) RIGHT_MAX_SPEED * TURN_SPEED, (float) LEFT_MAX_SPEED * TURN_SPEED);
+}
+
+void lookAroundLeft() { 
+        adjustMotorSpeed((float) RIGHT_MAX_SPEED * TURN_SPEED, -1 * (float) LEFT_MAX_SPEED * TURN_SPEED);
 }
 
 boolean serverLightSensed() { 
@@ -350,19 +397,23 @@ void reverseFromLeft() {
 }
 
 void goBackwards() { 
-	adjustMotorSpeed(-1 * MAX_SPEED, -1 * MAX_SPEED);
+	adjustMotorSpeed(-1 * RIGHT_MAX_SPEED, -1 * LEFT_MAX_SPEED);
 }
 
 void goForward() { 
-	adjustMotorSpeed(MAX_SPEED, MAX_SPEED);
+	adjustMotorSpeed(RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
+}
+
+void stopMotor() { 
+  adjustMotorSpeed(0,0);
 }
 
 void alignWithTape() {
 	if (sideToAlign == LEFT) { 
-		adjustMotorSpeed(MAX_SPEED/4, -1 * MAX_SPEED/4);
+		adjustMotorSpeed(RIGHT_MAX_SPEED/4, -1 * LEFT_MAX_SPEED/4);
 	}
 	if (sideToAlign == RIGHT) { 
-		adjustMotorSpeed(-1 * MAX_SPEED/4, MAX_SPEED/4);
+		adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/4, LEFT_MAX_SPEED/4);
 	}
 }
 
@@ -436,24 +487,24 @@ boolean doneCollecting() {
 }
 
 void turn() {
-	adjustMotorSpeed(-1 * MAX_SPEED/2, -1 * MAX_SPEED/2);
+	adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/2, -1 * LEFT_MAX_SPEED/2);
 	delay(250);
-	adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED);
+	adjustMotorSpeed(RIGHT_MAX_SPEED/2, -1 * LEFT_MAX_SPEED);
 	delay(125);
-	adjustMotorSpeed(MAX_SPEED/2, MAX_SPEED/2);
+	adjustMotorSpeed(RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
 	delay(250);
-	adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
 	delay(125);
 }
 
 void turnBack() { 
-	adjustMotorSpeed(-1 * MAX_SPEED/2, -1 * MAX_SPEED/2);
+	adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/2, -1 * LEFT_MAX_SPEED/2);
 	delay(250);
-	adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+	adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
 	delay(125);
-	adjustMotorSpeed(MAX_SPEED/2, MAX_SPEED/2);
+	adjustMotorSpeed(RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
 	delay(250);
-	adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED);
+	adjustMotorSpeed(RIGHT_MAX_SPEED/2, -1 * LEFT_MAX_SPEED);
 	delay(125);
 	sideToAlign = LEFT;
 
@@ -473,28 +524,28 @@ boolean tapeUnseen() {
 	return curr_tape_sensor_values[0] == LOW and curr_tape_sensor_values[1] == LOW;
 }
 
-boolean rightSensorOn() { 
-	int input = 2 * pulseIn(rightSensorInput, HIGH, 600);
-	return (input < 339 && input > 327);
-}
+//boolean rightSensorOn() { 
+//	int input = 2 * pulseIn(rightSensorInput, HIGH, 600);
+//	return (input < 339 && input > 327);
+//}
 
 boolean centerSensorOn() { 
 	int input = 2 * pulseIn(centerSensorInput, HIGH, 600);
 	return (input < 339 && input > 327);
 }
 
-boolean leftSensorOn() { 
-	int input = 2 * pulseIn(leftSensorInput, HIGH, 600);
-	return (input < 339 && input > 327);
-}
+//boolean leftSensorOn() { 
+//	int input = 2 * pulseIn(leftSensorInput, HIGH, 600);
+//	return (input < 339 && input > 327);
+//}
 
-
+//TODO: fix to accomodate turning
 boolean threeIsAvailable() {
 	boolean beaconSensed;
 	if (bumpedRightOrLeft == RIGHT) { 
-		beaconSensed = rightSensorOn();
+	//	beaconSensed = rightSensorOn();
 	} else { 
-		beaconSensed = leftSensorOn();
+		//beaconSensed = leftSensorOn();
 	}
 	return (coinsGotten == 8 and beaconSensed);
 }
@@ -502,9 +553,9 @@ boolean threeIsAvailable() {
 boolean fiveIsAvailable() {
 	int beaconSensed;
 	if (bumpedRightOrLeft == RIGHT) { 
-		beaconSensed = leftSensorOn();
+		//beaconSensed = leftSensorOn();
 	} else { 
-		beaconSensed = rightSensorOn();
+		//beaconSensed = rightSensorOn();
 	}
 	return (coinsGotten == 8 and beaconSensed);
 }
@@ -515,20 +566,20 @@ boolean eightIsAvailable() {
 
 void turnTo3() {
 	if (bumpedRightOrLeft == LEFT) {
-		adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+		adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
 	}
 	if (bumpedRightOrLeft == RIGHT) { 
-		adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED/2);
+		adjustMotorSpeed(RIGHT_MAX_SPEED/2, -1 * LEFT_MAX_SPEED/2);
 	}
 	TMRArd_InitTimer(0, TURN_TIME);
 }
 
 void turnTo5() {
 	if (bumpedRightOrLeft == RIGHT) {
-		adjustMotorSpeed(-1 * MAX_SPEED/2, MAX_SPEED/2);
+		adjustMotorSpeed(-1 * RIGHT_MAX_SPEED/2, LEFT_MAX_SPEED/2);
 	}
 	if (bumpedRightOrLeft == LEFT) { 
-		adjustMotorSpeed(MAX_SPEED/2, -1 * MAX_SPEED/2);
+		adjustMotorSpeed(RIGHT_MAX_SPEED/2, -1 * LEFT_MAX_SPEED/2);
 	}
 	TMRArd_InitTimer(0, TURN_TIME);
 }
@@ -658,20 +709,21 @@ void toggleMotorDirection()
 
 void adjustMotorSpeed(int rightSpeed, int leftSpeed)
 {
-  if (rightSpeed < 0) { 
-    rightSpeed = -1 * rightSpeed;
-    int currVal = digitalRead(rightWheelToggle);
-    if (currVal == HIGH)  digitalWrite(rightWheelToggle, LOW);
-    else digitalWrite(rightWheelToggle, HIGH);
+//  Serial.println(rightSpeed);
+//  Serial.println(leftSpeed);
+  if (rightSpeed < 0) {
+    digitalWrite(rightWheelToggle, HIGH);
+  } else {
+    digitalWrite(rightWheelToggle, LOW);
   }
-  if (leftSpeed < 0) { 
-    leftSpeed = -1 * leftSpeed;
-    int currVal = digitalRead(leftWheelToggle);
-    if (currVal == HIGH)  digitalWrite(leftWheelToggle, LOW);
-    else digitalWrite(leftWheelToggle, HIGH);
+  
+  if (leftSpeed < 0) {
+    digitalWrite(leftWheelToggle, LOW);
+  } else {
+    digitalWrite(leftWheelToggle, HIGH);
   }
-  analogWrite(rightMotorPWM,rightSpeed);
-  analogWrite(leftMotorPWM,leftSpeed);
+  analogWrite(rightMotorPWM,abs(rightSpeed));
+  analogWrite(leftMotorPWM,abs(leftSpeed));
 }
 
 int getDistance()
@@ -685,5 +737,7 @@ int getDistance()
   
   float maxDistance = 100;
   int led = map(distance, 0, maxDistance, 0, 255);
+ // last_distance = led;
+  Serial.println(led);
   return led;
 }
