@@ -142,10 +142,14 @@ void setup() {
   digitalWrite(pusherEnable, LOW);
 
   TMRArd_ClearTimerExpired(0);
+  coinsGotten = 0
+  coinsWanted = 8
 
 }
 
 void loop() {
+
+  collect();
 }
     
 
@@ -244,6 +248,12 @@ void getFiveCoins() {
 	TMRArd_InitTimer(0, PUSHER_TIME); 
 }
 
+void collect() { 
+  if (coinsGotten < coinsWanted) { 
+    pushAlgorithmButton();
+    TMRArd_InitTimer(0, PUSHER_TIME);
+  }
+}
 
 void pushAlgorithmButton() { 
 	push();
@@ -254,11 +264,12 @@ void pushAlgorithmButton() {
 
 }
 
-void collect() { 
-	if (coinsGotten < coinsWanted) { 
-		pushAlgorithmButton();
-		TMRArd_InitTimer(0, PUSHER_TIME);
-	}
+void push() {
+  digitalWrite(pusherEnable, HIGH);
+    digitalWrite(pusherToggle, HIGH);
+    delay(PUSHER_TIME);
+    digitalWrite(pusherToggle, LOW);
+    digitalWrite(pusherEnable, LOW);
 }
 
 boolean doneCollecting() { 
@@ -308,14 +319,6 @@ void unloadFiveDumpServo() {
 	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos'
 	  delayMicroseconds(DELAY);
 	}    
-}
-
-void push() {
-	digitalWrite(pusherEnable, HIGH);
-  	digitalWrite(pusherToggle, HIGH);
-  	delay(PUSHER_TIME);
-  	digitalWrite(pusherToggle, LOW);
-  	digitalWrite(pusherEnable, LOW);
 }
 
 void adjustMotorSpeed(int rightSpeed, int leftSpeed)

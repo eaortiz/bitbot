@@ -19,8 +19,6 @@
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
-//#define rightSensorInput 17
-//#define leftSensorInput 16
 #define distanceTrigger 16
 #define distanceEcho 17
 #define centerSensorInput 18
@@ -49,9 +47,6 @@ int state;
 #define GO_TO_MIDDLE_2 3
 #define LOOKING 2
 #define APPROACH_SERVER 4
-//#define GO_TO_SERVER 1 //going straight until server is hit
-//#define REVERSE 2 //align 
-//#define FORWARD 4 //reach tape
 #define ALIGN_WITH_TAPE 5 //turn forward
 #define GET_3_COINS 6
 #define GET_5_COINS 7
@@ -89,9 +84,6 @@ int nextLeftBack;
 //Servos
 Servo threeCoinDump;
 Servo fiveCoinDump;  
-
-//sensors
-QTRSensorsAnalog tapeSensors((unsigned char[]) {frontTapeSensorInput, backTapeSensorInput}, 2);
 
 void setup() { 
   Serial.begin(9600);
@@ -141,6 +133,8 @@ void setup() {
   digitalWrite(pusherEnable, LOW);
 
   TMRArd_ClearTimerExpired(0);
+  
+  
 // state = 1000;
   state = GET_DIRECTION;
   lookAroundRight();
