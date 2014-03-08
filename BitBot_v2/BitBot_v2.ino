@@ -120,8 +120,8 @@ void setup() {
   digitalWrite(pusherEnable, LOW);
 
   TMRArd_ClearTimerExpired(0);
-  threeCoinDump.write(60);
-  fiveCoinDump.write(60);
+  threeCoinDump.write(170);
+  fiveCoinDump.write(20);
   
   state = COLLECT;
   getCoins();
@@ -283,16 +283,18 @@ unsigned char TestTimerExpired(void) {
   }
   return value;
 }
+
 //This function sweeps the servo searching the area for an object within range
 void unloadThreeDumpServo() {
 
 	Serial.println("Unloading...");
-	for(int pos = 180; pos>=90; pos -= 1)     // goes from 180 degrees to 0 degrees 
+	for(int pos = 170; pos>=70; pos -= 1)     // goes from 180 degrees to 0 degrees 
 	{                                
 	  threeCoinDump.write(pos);              // tell servo to go to position in variable 'pos' 
 	  delayMicroseconds(DELAY);
-    }
-	for(int pos = 90; pos < 180; pos += 1)  // goes from 0 degrees to 180 degrees 
+        }
+        delay(1000);
+	for(int pos = 70; pos < 170; pos += 1)  // goes from 0 degrees to 180 degrees 
 	{                                  // in steps of 1 degree 
 	  threeCoinDump.write(pos);              // tell servo to go to position in variable 'pos'
 	  delayMicroseconds(DELAY);
@@ -302,16 +304,17 @@ void unloadThreeDumpServo() {
 void unloadFiveDumpServo() {
 
 	Serial.println("Unloading...");
-	for(int pos = 180; pos >= 90; pos -= 1)     // goes from 180 degrees to 0 degrees 
-	{                                
-	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos' 
-	  delayMicroseconds(DELAY);
-    }
-	for(int pos = 90; pos < 180; pos += 1)  // goes from 0 degrees to 180 degrees 
+	for(int pos = 20; pos < 130; pos += 1)  // goes from 0 degrees to 180 degrees 
 	{                                  // in steps of 1 degree 
 	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos'
 	  delayMicroseconds(DELAY);
-	}    
+	} 
+	delay(1000);
+	for(int pos = 130; pos >= 20; pos -= 1)     // goes from 180 degrees to 0 degrees 
+	{                                
+	  fiveCoinDump.write(pos);              // tell servo to go to position in variable 'pos' 
+	  delayMicroseconds(DELAY);
+        }  
 }
 
 void adjustMotorSpeed(int rightSpeed, int leftSpeed)
