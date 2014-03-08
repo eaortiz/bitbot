@@ -50,29 +50,7 @@
 
 //states
 int state;
-//#define GET_DIRECTION 0 //going around looking for light
-#define GO_TO_MIDDLE    1
-//#define GO_TO_MIDDLE_2 3
-#define AT_MIDDLE        0
-#define LOOKING 2
-#define APPROACH_SERVER 4
-//#define GO_TO_SERVER 1 //going straight until server is hit
-//#define REVERSE 2 //align 
-//#define FORWARD 4 //reach tape
-#define ALIGN_WITH_TAPE 5 //turn forward
-#define GET_3_COINS 6
-#define GET_5_COINS 7
-#define TURNING 8
-#define TURN_BACK 9
-#define GOING_TO_CENTER 10
-#define TURNING_TO_3 11
-#define TURNING_TO_5 12
-#define GOING_TO_3 13
-#define GOING_TO_5 14
-#define GOING_TO_8 15
-#define GO_BACK 16
-#define DUMPING 17
-#define APPROACH_BEACON 18
+#define COLLECT 0
 
 //variables
 int bumpedRightOrLeft = RIGHT; //right or left one is three
@@ -142,16 +120,71 @@ void setup() {
   digitalWrite(pusherEnable, LOW);
 
   TMRArd_ClearTimerExpired(0);
-  coinsGotten = 0
-  coinsWanted = 8
-
+  threeCoinDump.write(60);
+  fiveCoinDump.write(60);
+  
+  state = COLLECT;
+  getCoins();
 }
 
 void loop() {
-
-  collect();
+  
+  if (state == COLLECT) {
+    if(TestTimerExpired()) { 
+      Serial.println(coinsWanted);
+      Serial.println(coinsGotten);
+      Serial.println(pushes);
+      collect();
+    }
+    if (doneCollecting()) { 
+      goBackwards();
+    }
+  }
 }
     
+void getCoins() { 
+  hasDumped = false;
+  coinsGotten = 0;
+  pushes = 0;
+  coinsWanted = 3;
+  TMRArd_InitTimer(0, PUSHER_TIME); 
+}
+
+void getFiveCoins() { 
+	if (hasDumped) coinsWanted = 16;
+	else coinsWanted = 8;
+	TMRArd_InitTimer(0, PUSHER_TIME); 
+}
+
+void collect() { 
+  if (coinsGotten < coinsWanted) { 
+    pushAlgorithmButton();
+    TMRArd_InitTimer(0, PUSHER_TIME);
+  }
+}
+
+void pushAlgorithmButton() { 
+	push();
+	pushes += 1;
+	if (pushes == coinsGotten + 1) { 
+		coinsGotten += 1;
+                pushes = 0;
+	}
+}
+
+void push() {
+    digitalWrite(pusherEnable, HIGH);
+    digitalWrite(pusherToggle, HIGH);
+    delay(PUSHER_TIME);
+    digitalWrite(pusherToggle, LOW);
+    delay(100);
+    digitalWrite(pusherEnable, LOW);
+}
+
+boolean doneCollecting() { 
+	return coinsGotten == coinsWanted;
+}
+
 
 boolean nearWall() {
   return (getDistance() < WALLDISTANCE);
@@ -236,46 +269,6 @@ void alignWithTape() {
 	}
 }
 
-void getThreeCoins() { 
-	if (hasDumped) coinsWanted = 11;
-	else coinsWanted = 3;
-	TMRArd_InitTimer(0, PUSHER_TIME); 
-}
-
-void getFiveCoins() { 
-	if (hasDumped) coinsWanted = 16;
-	else coinsWanted = 8;
-	TMRArd_InitTimer(0, PUSHER_TIME); 
-}
-
-void collect() { 
-  if (coinsGotten < coinsWanted) { 
-    pushAlgorithmButton();
-    TMRArd_InitTimer(0, PUSHER_TIME);
-  }
-}
-
-void pushAlgorithmButton() { 
-	push();
-	pushes += 1;
-	if (pushes == coinsGotten) { 
-		coinsGotten +=1;
-	}
-
-}
-
-void push() {
-  digitalWrite(pusherEnable, HIGH);
-    digitalWrite(pusherToggle, HIGH);
-    delay(PUSHER_TIME);
-    digitalWrite(pusherToggle, LOW);
-    digitalWrite(pusherEnable, LOW);
-}
-
-boolean doneCollecting() { 
-	return coinsGotten == coinsWanted;
-}
-
 boolean centerSensorOn() { 
 	unsigned long input = pulseIn(centerSensorInput, HIGH, 600);
         unsigned long input2 = pulseIn(centerSensorInput,LOW,600);
@@ -349,6 +342,5 @@ int getDistance()
   
   float maxDistance = 100;
   int led = map(distance, 0, maxDistance, 0, 255);
-  Serial.println(led);
   return led;
 }
