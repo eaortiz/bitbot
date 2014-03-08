@@ -31,27 +31,22 @@ void setup() {
   pinMode(leftMotorPWM, OUTPUT);
   Serial.begin(9600);
   Serial.println("start");
+   //wheels
+  digitalWrite(rightWheelToggle, HIGH);
+  digitalWrite(leftWheelToggle, HIGH);
   goForward();
-  delay(50);
+  delay(500);
   
 }
 
 void loop() { 
+  Serial.print(digitalRead(backReceiver));
+  Serial.println(digitalRead(frontReceiver));
   if (state == START) { 
-    if (!isAligned()) { 
+    if (frontAligned()) { 
       Serial.println("sup");
-      stopMotor();
-//      goForward();
-  //    delay(500);
-    //  if (side_to_turn == RIGHT) { 
-      //  lookAroundRight();
-//        side_to_turn = LEFT;
-  ///    } else { 
-     //   lookAroundLeft();
-       // side_to_turn = RIGHT;
-      //}
-      //state = ALIGNING;
-   
+      lookAroundLeft();
+      state== ALIGNING;
     }
   }
   //when in this state
@@ -111,19 +106,18 @@ void stopMotor() {
 
 void adjustMotorSpeed(int rightSpeed, int leftSpeed)
 {
-//  Serial.println(rightSpeed);
-//  Serial.println(leftSpeed);
-  if (rightSpeed < 0) {
-    digitalWrite(rightWheelToggle, HIGH);
-  } else {
-    digitalWrite(rightWheelToggle, LOW);
+  if (rightSpeed < 0) { 
+    rightSpeed = -1 * rightSpeed;
+    int currVal = digitalRead(rightWheelToggle);
+    if (currVal == HIGH)  digitalWrite(rightWheelToggle, LOW);
+    else digitalWrite(rightWheelToggle, HIGH);
   }
-  
-  if (leftSpeed < 0) {
-    digitalWrite(leftWheelToggle, LOW);
-  } else {
-    digitalWrite(leftWheelToggle, HIGH);
+  if (leftSpeed < 0) { 
+    leftSpeed = -1 * leftSpeed;
+    int currVal = digitalRead(leftWheelToggle);
+    if (currVal == HIGH)  digitalWrite(leftWheelToggle, LOW);
+    else digitalWrite(leftWheelToggle, HIGH);
   }
-  analogWrite(rightMotorPWM,abs(rightSpeed));
-  analogWrite(leftMotorPWM,abs(leftSpeed));
+  analogWrite(rightMotorPWM,rightSpeed);
+  analogWrite(leftMotorPWM,leftSpeed);
 }
