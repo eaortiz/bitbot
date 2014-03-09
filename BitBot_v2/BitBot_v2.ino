@@ -9,7 +9,7 @@
 #define LEFT 0
 #define MAX_TAPE_SENSOR_VAL 1023
 #define RIGHT_MAX_SPEED 125
-#define LEFT_MAX_SPEED 200
+#define LEFT_MAX_SPEED 170
 #define DELAY 500
 #define TAPE_HIGH 10
 #define TAPE_LOW 8
@@ -17,9 +17,10 @@
 #define TIME_TO_90 500
 #define TIME_TO_180 1000
 #define TIME_INTERVAL 2500
-#define WALLDISTANCE 40
+#define WALLDISTANCE 30
 #define HOMING_INTERVAL 1000
 #define STRAIGHTDELAYTIME 100
+#define IDLE_TIME 5000
 
 /*---------------- Module Level Variables ---------------------------*/
 //analog
@@ -51,7 +52,10 @@
 //states
 int state;
 #define COLLECT 0
-
+#define BACKWARDS 1
+#define DUMPING 2
+#define START 3
+#define LOOKING 4
 //variables
 int bumpedRightOrLeft = RIGHT; //right or left one is three
 int coinsGotten = 0;
@@ -64,6 +68,7 @@ char *sequence_of_tape_sensor_changes; //A front on, B front off, C back on, D b
 byte byteRead;
 int sideToAlign = RIGHT;
 float TURN_SPEED = .5;
+int turn_count = 0;
 
 //for collision logic 
 int nextLeft;
@@ -123,21 +128,53 @@ void setup() {
   threeCoinDump.write(170);
   fiveCoinDump.write(20);
   
-  state = COLLECT;
-  getCoins();
+ // state = COLLECT;
+//  getCoins();
+  state = LOOKING;
+  goForward();
+  TMRArd_InitTimer(0, IDLE_TIME); 
+  turn_count = 0;
 }
+
+int side = RIGHT;
 
 void loop() {
   
+ 
+  if (state == LOOKING) { 
+    if (TestTimerExpired()) { 
+      if (side == RIGHT) {
+        lookAroundRight();
+        turn_count += 1;
+        if (turn_count > 3) side = LEFT;
+      }else {
+        lookAroundLeft();
+        turn_count += 1;
+        if (turn_count > 3) side = RIGHT;
+      }
+      delay(1000);
+      goForward();
+      TMRArd_InitTimer(0, IDLE_TIME); 
+    }
+    if(serverLightSensed() || centerLightSensedServer() || centerSensorExchange() || serverSensorExchange()) { 
+      stopMotor();
+    }
+  }
+  
   if (state == COLLECT) {
     if(TestTimerExpired()) { 
-      Serial.println(coinsWanted);
-      Serial.println(coinsGotten);
-      Serial.println(pushes);
       collect();
     }
     if (doneCollecting()) { 
       goBackwards();
+      state = BACKWARDS;
+    }
+  }
+  if (state == BACKWARDS) { 
+    if (nearWall()) { 
+      unloadFiveDumpServo();
+      unloadThreeDumpServo();
+      state = DUMPING;
     }
   }
 }
@@ -187,7 +224,16 @@ boolean doneCollecting() {
 
 
 boolean nearWall() {
-  return (getDistance() < WALLDISTANCE);
+  boolean near = true;
+  int i = 0;
+  while (i < 10) { 
+    int distance = getDistance();
+    near = near && (distance < WALLDISTANCE) && distance != 0;
+    i+=1;
+  }
+  Serial.print("result: ");
+  Serial.println(near);
+  return near;
 }
 
 void lookAroundRight() { 
@@ -204,6 +250,16 @@ boolean serverLightSensed() {
    unsigned long inputsum;
    input = pulseIn(serverSensorInput,LOW);
    inputtwo = pulseIn(serverSensorInput,HIGH);
+   inputsum = input+inputtwo;
+   return (inputsum < 1200 && inputsum > 1100);
+}
+
+boolean centerLightSensedServer() { 
+   unsigned long input;
+   unsigned long inputtwo;
+   unsigned long inputsum;
+   input = pulseIn(centerSensorInput,LOW);
+   inputtwo = pulseIn(centerSensorInput,HIGH);
    inputsum = input+inputtwo;
    return (inputsum < 1200 && inputsum > 1100);
 }
@@ -269,9 +325,16 @@ void alignWithTape() {
 	}
 }
 
-boolean centerSensorOn() { 
+boolean centerSensorExchange() { 
 	unsigned long input = pulseIn(centerSensorInput, HIGH, 600);
         unsigned long input2 = pulseIn(centerSensorInput,LOW,600);
+        unsigned long inputsum = input+input2;
+	return (inputsum < 300 && inputsum > 350);
+}
+
+boolean serverSensorExchange() { 
+	unsigned long input = pulseIn(serverSensorInput, HIGH, 600);
+        unsigned long input2 = pulseIn(serverSensorInput,LOW,600);
         unsigned long inputsum = input+input2;
 	return (inputsum < 300 && inputsum > 350);
 }
@@ -345,5 +408,7 @@ int getDistance()
   
   float maxDistance = 100;
   int led = map(distance, 0, maxDistance, 0, 255);
+  Serial.print("d: ");
+  Serial.println(led);
   return led;
 }
